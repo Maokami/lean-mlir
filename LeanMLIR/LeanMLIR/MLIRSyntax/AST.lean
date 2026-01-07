@@ -63,9 +63,82 @@ inductive MLIRType (φ : Nat) : Type _ where
   | tensor1d: MLIRType φ -- tensor of int values.
   | tensor2d: MLIRType φ -- tensor of int values.
   | tensor4d: MLIRType φ -- tensor of int values.
+  | tuple: List (MLIRType φ) -> MLIRType φ -- tuple type
+  | fn: MLIRType φ -> MLIRType φ -> MLIRType φ -- function type
   | index:  MLIRType φ
   | undefined: String → MLIRType φ
-  deriving Repr, DecidableEq
+  deriving Repr
+
+mutual
+  private def decEqMLIRType (a b : MLIRType φ) : Decidable (a = b) := by
+    cases a <;> cases b
+    case int.int s w s' w' =>
+      cases decEq s s' with
+      | isTrue hs =>
+          cases decEq w w' with
+          | isTrue hw =>
+              exact isTrue (by cases hs; cases hw; rfl)
+          | isFalse hw =>
+              exact isFalse (by intro h; cases h; exact hw rfl)
+      | isFalse hs =>
+          exact isFalse (by intro h; cases h; exact hs rfl)
+    case float.float n m =>
+      cases decEq n m with
+      | isTrue h =>
+          exact isTrue (by cases h; rfl)
+      | isFalse h =>
+          exact isFalse (by intro hnm; cases hnm; exact h rfl)
+    case tensor1d.tensor1d =>
+      exact isTrue rfl
+    case tensor2d.tensor2d =>
+      exact isTrue rfl
+    case tensor4d.tensor4d =>
+      exact isTrue rfl
+    case tuple.tuple xs ys =>
+      cases decEqMLIRTypeList xs ys with
+      | isTrue h =>
+          exact isTrue (by cases h; rfl)
+      | isFalse h =>
+          exact isFalse (by intro hxy; cases hxy; exact h rfl)
+    case fn.fn a1 r1 a2 r2 =>
+      cases decEqMLIRType a1 a2 with
+      | isTrue ha =>
+          cases decEqMLIRType r1 r2 with
+          | isTrue hr =>
+              exact isTrue (by cases ha; cases hr; rfl)
+          | isFalse hr =>
+              exact isFalse (by intro h; cases h; exact hr rfl)
+      | isFalse ha =>
+          exact isFalse (by intro h; cases h; exact ha rfl)
+    case index.index =>
+      exact isTrue rfl
+    case undefined.undefined s t =>
+      cases decEq s t with
+      | isTrue h =>
+          exact isTrue (by cases h; rfl)
+      | isFalse h =>
+          exact isFalse (by intro hst; cases hst; exact h rfl)
+    all_goals
+      exact isFalse (by intro h; cases h)
+
+  private def decEqMLIRTypeList (xs ys : List (MLIRType φ)) : Decidable (xs = ys) := by
+    cases xs <;> cases ys
+    · exact isTrue rfl
+    · exact isFalse (by intro h; cases h)
+    · exact isFalse (by intro h; cases h)
+    · rename_i x xs y ys
+      cases decEqMLIRType x y with
+      | isTrue hxy =>
+          cases decEqMLIRTypeList xs ys with
+          | isTrue hxs =>
+              exact isTrue (by cases hxy; cases hxs; rfl)
+          | isFalse hxs =>
+              exact isFalse (by intro h; cases h; exact hxs rfl)
+      | isFalse hxy =>
+          exact isFalse (by intro h; cases h; exact hxy rfl)
+end
+
+instance : DecidableEq (MLIRType φ) := decEqMLIRType
 
 variable (φ : Nat)
 
